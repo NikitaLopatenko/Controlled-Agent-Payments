@@ -1,22 +1,24 @@
 # CAP
 
-An agent can pay for something with the owner's money. If the connection drops, nobody knows whether that payment went through. Asking again with a new purchase can spend the money twice.
+CAP brings a payment record to an agent that spends its owner's USDC.
 
-CAP (Controlled Agent Payments) is the record that stops that. It lets an agent spend the owner's USDC on a website that already answers HTTP 402, the "payment required" response from [x402](https://github.com/coinbase/x402). One purchase keeps one id. A shared budget and a per-payment cap limit the spend. Only listed merchants can be paid. If the outcome is unclear, that same purchase stays open until there is final evidence.
+An agent can call a website that answers HTTP 402, the "payment required" response from [x402](https://github.com/coinbase/x402). CAP is the layer around that payment. It gives the owner one shared budget, a cap on each purchase, and a list of merchants the agent may pay. Every purchase keeps one id. If the connection drops, that same purchase stays open until there is final evidence, so a retry cannot spend the money a second time.
 
-Experimental and unpublished. Tested on Apple Silicon with Node 24.22.2 and Rust 1.93.0. The dependency scan still fails on [RUSTSEC-2026-0387](SECURITY.md#current-release-gate). An AI-assisted source review is not an independent audit, and local checks are not a test with real funds on a chain.
+The owner still signs. CAP never sees the wallet keys, and it never takes custody of the USDC.
 
-## The problem
+## What it brings
 
-A paid website can answer "payment required" instead of doing the work. The agent pays with the owner's USDC and tries again. That works when the answer comes back.
+- **One purchase, one id.** The same id is the same purchase. A new id is a new charge.
+- **A shared budget.** Every agent drawing on that budget spends from the same limit.
+- **A cap on each payment.** A single purchase cannot exceed its own maximum.
+- **A merchant list.** CAP will only prepare a payment for a website on that list.
+- **A record when the outcome is unclear.** The purchase stays open until the chain shows what happened.
 
-It breaks when the answer does not come back. The payment may have landed, or it may not. An automatic retry that starts a fresh purchase will pay a second time. The owner cannot see, from the agent's next attempt, which of those happened.
+USDC here is the pinned dollar-pegged token on Base. Tests use Base Sepolia. Amounts are decimal strings. 1 USDC is `1000000`, because the token uses six decimal places.
 
-That matters because the spender is a program. It will retry. The money is not the program's.
+## How a payment moves
 
-## What CAP does
-
-CAP sits between the agent and the website. It does not hold the wallet keys, and it does not take custody of the USDC. The owner still signs. CAP writes down the purchase before that signature and does not open a second one for the same id.
+The agent asks the website for something. If the work is free, CAP closes the purchase and the wallet is never used. If the website answers 402, CAP checks the merchant, the budget, and the cap, then asks the owner to sign once.
 
 ```mermaid
 flowchart TD
@@ -35,15 +37,7 @@ flowchart TD
   cap -->|read final evidence only| chain
 ```
 
-Before any signature, CAP checks three things:
-
-- the website is on the merchant list
-- this purchase is inside the shared budget
-- this purchase is under its own cap
-
-USDC here means the pinned dollar-pegged token on Base, or on Base Sepolia for tests. Amounts are decimal strings. 1 USDC is `1000000`, because the token uses six decimal places.
-
-## What happens to one purchase
+## Life of one purchase
 
 ```mermaid
 flowchart TD
@@ -62,27 +56,27 @@ flowchart TD
   proof -->|Authorization expired unused| released[Reserve released. No charge.]
 ```
 
-"Reserved" is a row in CAP's books. It is not money locked in escrow. A later HTTP 402 does not refund a payment that already moved. Paying the website does not mean the work was useful.
+The reserve is a row in CAP's books. The USDC stays in the owner's wallet until the payment settles on the chain. A later 402 response does not return money that already moved. A paid website does not, by itself, mean the work was useful.
 
-If the outcome is unclear, keep the same purchase id and reconcile it. A new id is a new purchase.
+When the outcome is unclear, the application uses the same purchase id and asks CAP to reconcile it.
 
-## What you bring
+## What an application connects
 
-CAP does not log in, hold keys, or choose which chain node to trust. Your application brings:
+CAP keeps the record. The application around it brings the authority and the infrastructure.
 
-| You supply | Why |
+| The application brings | What CAP uses it for |
 | --- | --- |
-| An authenticated caller | Ids are labels. They do not grant access. |
-| A signer with `address` and `signTypedData` | CAP asks the wallet to sign. It never sees the key. |
-| A read-only chain connection you trust | Recovery is only as honest as that connection. |
-| Your existing PostgreSQL pool | The ledger lives there. CAP does not open or close the pool. |
+| An authenticated caller | Ids name the owner, budget, agent, and purchase. They do not grant access. |
+| A signer with `address` and `signTypedData` | CAP asks this wallet to sign. The key stays outside CAP. |
+| A read-only chain connection the application trusts | Recovery follows that connection's view of the chain. |
+| The application's PostgreSQL pool | The ledger lives there. CAP does not open or close the pool. |
 | The merchant list and the budget | These are the limits on this spend. |
 
-## Usage
+## Use it
 
-Packages are not published yet. [Build from source](CONTRIBUTING.md#development) or [install matching local tarballs](CONTRIBUTING.md#local-packages).
+Packages are not published yet. [Build from source](CONTRIBUTING.md#development) or [install matching local packages](CONTRIBUTING.md#local-packages).
 
-Create the schema, the budget, and the client once. This example buys one answer from a website. The budget is 1 USDC. Each purchase is capped at 0.01 USDC.
+The example below creates the ledger, a budget of 1 USDC, and a client whose largest single purchase is 0.01 USDC. It then buys one answer from a website.
 
 ```js
 import { createAgentPayments } from '@cap/payments';
@@ -116,11 +110,13 @@ async function main({ pool, signer, rpc, context, service }) {
 }
 ```
 
-`context` is `{ ownerId, budgetId, agentId, operationId }`. `service` is `{ origin, payTo, url }`. Read the response body, or cancel it, including `error.response`. That body is not safe to log. If a call fails, use the same client and the same purchase id to inspect and reconcile. Never invent a fresh id to pay an uncertain purchase again.
+`context` is `{ ownerId, budgetId, agentId, operationId }`. `service` is `{ origin, payTo, url }`.
 
-The field-by-field contract is in the [SDK README](packages/payments/README.md#backend-contract). What the balances mean is in [Balance and recovery](packages/payments/README.md#what-balances-mean).
+Read the response body, or cancel it. That includes `error.response` when a call fails. Those bodies are not safe to log. A failed purchase is reconciled with the same client and the same purchase id.
 
-## Try it without spending money
+The field-by-field contract is in the [SDK README](packages/payments/README.md#backend-contract). The meaning of the balances is in [Balance and recovery](packages/payments/README.md#what-balances-mean).
+
+## Try a purchase with no money
 
 After [building from source](CONTRIBUTING.md#development):
 
@@ -128,19 +124,21 @@ After [building from source](CONTRIBUTING.md#development):
 npm exec --workspace @cap/testing -- cap test --agent-module "$PWD/examples/agent.mjs"
 ```
 
-This is a simulation. It needs no wallet, no chain credentials, and no PostgreSQL. Both cases should pass: `exact-payment` ends held `0` / spent `1000`, and `operator-budget-recovery` ends held `0` / spent `2400`. Add `--json` for the full report. Options are in the [tester guide](packages/testing/README.md).
+This runs a simulation. It needs no wallet, no chain credentials, and no PostgreSQL. Both cases should pass: `exact-payment` ends held `0` / spent `1000`, and `operator-budget-recovery` ends held `0` / spent `2400`. Add `--json` for the full report. Options are in the [tester guide](packages/testing/README.md).
 
 ## Before real money
 
-Authenticate every budget, purchase, read, and recovery. CAP reserves the maximum before the wallet signs, and an uncertain payment stays reserved until final evidence. The budget covers this ledger's USDC only, not gas and not spending outside CAP.
+CAP reserves the maximum before the wallet signs. An uncertain payment stays reserved until final evidence arrives. The budget covers this ledger's USDC. Gas, and any spending outside CAP, sit outside that budget.
 
-Use a stable purchase id and decimal strings for amounts. Do not retry a paid request automatically, and do not use the in-memory test store as a stand-in for PostgreSQL.
+Keep a stable purchase id, and pass amounts as decimal strings. A paid request should not be retried automatically. The in-memory store is for tests. Production uses PostgreSQL.
 
 Read [SECURITY.md](SECURITY.md) before connecting a wallet.
 
-## Development
+## Status
 
-Setup, checks, local packages, and publication are in [CONTRIBUTING.md](CONTRIBUTING.md).
+CAP 0.1.0 is an experimental preview for Apple Silicon, Node 24.22.2, and Rust 1.93.0. The locked-dependency scan still fails on [RUSTSEC-2026-0387](SECURITY.md#current-release-gate), so this preview is not a release for production funds.
+
+Setup, local checks, and publication steps are in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
