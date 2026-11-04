@@ -1,0 +1,19 @@
+[package]
+name = "cap-core"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+x402-types.workspace = true
+x402-chain-eip155.workspace = true
+alloy-primitives.workspace = true
+alloy-sol-types.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+getrandom.workspace = true
+url.workspace = true
+
+[dev-dependencies]
+proptest = { version = "=1.12.0", default-features = false, features = ["std"] }

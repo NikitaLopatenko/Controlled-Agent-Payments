@@ -1,0 +1,30 @@
+{
+  "name": "cap-workspace",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "engines": {
+    "node": ">=24.22.2 <25"
+  },
+  "workspaces": [
+    "packages/payments",
+    "packages/testing"
+  ],
+  "scripts": {
+    "build:native": "napi build --cwd packages/payments --manifest-path ../../Cargo.toml --package cap-native --package-json-path package.json --output-dir native --target aarch64-apple-darwin --platform --no-js --dts index.d.ts --release -- --locked",
+    "build": "npm run build:native && tsc -b packages/payments packages/testing && chmod +x packages/testing/dist/cli.js && node scripts/stage-legal.mjs",
+    "test": "node --test tests/*.test.mjs",
+    "test:postgres": "node scripts/postgres-smoke.mjs",
+    "smoke:consumer": "node scripts/consumer-smoke.mjs",
+    "measure": "node scripts/measure.mjs",
+    "security:check": "node scripts/security-check.mjs"
+  },
+  "devDependencies": {
+    "@napi-rs/cli": "3.10.9",
+    "typescript": "6.0.3",
+    "@types/node": "^24.0.0",
+    "@types/pg": "8.23.1",
+    "pg": "8.23.1"
+  }
+}

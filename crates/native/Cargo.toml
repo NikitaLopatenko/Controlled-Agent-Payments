@@ -1,0 +1,19 @@
+[package]
+name = "cap-native"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+cap-core = { path = "../core" }
+napi = { version = "=3.16.1", default-features = false, features = ["napi8", "serde-json", "dyn-symbols"] }
+napi-derive = "=3.7.0"
+serde_json.workspace = true
+serde.workspace = true
+
+[build-dependencies]
+napi-build = "=2.6.0"

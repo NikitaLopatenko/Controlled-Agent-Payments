@@ -1,0 +1,14 @@
+node_modules/
+target/
+.toolchain/
+.artifacts/
+packages/*/dist/
+packages/payments/native/
+packages/*/LICENSE
+packages/*/NOTICE
+/cap-*.tgz
+.DS_Store
+AUDIT.pdf
+.env
+.env.*
+.npmrc

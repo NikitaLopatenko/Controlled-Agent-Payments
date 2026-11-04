@@ -1,0 +1,50 @@
+{
+  "name": "@cap/payments",
+  "version": "0.1.0",
+  "type": "module",
+  "license": "MIT",
+  "engines": {
+    "node": ">=24.22.2 <25"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./postgres": {
+      "types": "./dist/postgres.d.ts",
+      "import": "./dist/postgres.js"
+    },
+    "./testing": {
+      "types": "./dist/testing.d.ts",
+      "import": "./dist/testing.js"
+    }
+  },
+  "files": [
+    "dist",
+    "native/*.node",
+    "native/*.d.ts",
+    "sql",
+    "README.md",
+    "LICENSE",
+    "NOTICE"
+  ],
+  "napi": {
+    "binaryName": "cap-native",
+    "targets": [
+      "aarch64-apple-darwin"
+    ]
+  },
+  "peerDependencies": {
+    "pg": "^8.23.1",
+    "@types/pg": "^8.23.1"
+  },
+  "peerDependenciesMeta": {
+    "pg": {
+      "optional": true
+    },
+    "@types/pg": {
+      "optional": true
+    }
+  }
+}

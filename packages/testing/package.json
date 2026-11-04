@@ -1,0 +1,33 @@
+{
+  "name": "@cap/testing",
+  "version": "0.1.0",
+  "type": "module",
+  "license": "MIT",
+  "engines": {
+    "node": ">=24.22.2 <25"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "bin": {
+    "cap": "./dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE",
+    "NOTICE"
+  ],
+  "dependencies": {
+    "@cap/payments": "0.1.0",
+    "@x402/core": "2.29.0",
+    "@x402/evm": "2.29.0",
+    "@x402/hono": "2.29.0",
+    "viem": "2.57.13",
+    "hono": "4.13.14",
+    "@hono/node-server": "2.1.5"
+  }
+}
