@@ -1,6 +1,8 @@
 import type { AgentPayments, AgentPaymentsOptions, OperationState } from '@cap/payments';
 
+// The two scenarios the CLI can run, and the report shape it is willing to print.
 export const SCENARIO_IDS = ['exact-payment', 'operator-budget-recovery'] as const;
+
 export type ScenarioId = typeof SCENARIO_IDS[number];
 export type AgentUnderTest = Pick<AgentPayments, 'fetch' | 'reconcile'>;
 export type AgentTestFactory = (options: AgentPaymentsOptions) => AgentUnderTest | Promise<AgentUnderTest>;
@@ -36,6 +38,7 @@ export interface TestReport {
   passed: boolean;
   scenarios: ScenarioReport[];
 }
+// Fixed messages. A test's own error text is never copied into the report.
 export const FACTORY_ERROR = 'Agent factory must return fetch and reconcile methods.';
 export const SCENARIO_TIMEOUT = 'Scenario exceeded its 10000 ms deadline.';
 export const WORKER_TIMEOUT = 'Test worker exceeded its 15000 ms deadline.';
@@ -52,15 +55,23 @@ export function selectOptions(input: PaymentTestOptions): {
   ids: ScenarioId[]; profile: TestReport['profile']; createAgent?: AgentTestFactory;
 } {
   try {
+
     if (input === null || typeof input !== 'object' || Array.isArray(input) ||
       (Object.getPrototypeOf(input) !== Object.prototype && Object.getPrototypeOf(input) !== null) ||
       Reflect.ownKeys(input).some(key => key !== 'scenarios' && key !== 'createAgent')) throw new Error();
+
     const factoryPresent = Object.hasOwn(input, 'createAgent'), createAgent = input.createAgent;
+
     if (factoryPresent && typeof createAgent !== 'function') throw new Error();
+
     const scenarios = input.scenarios;
+
     if (scenarios !== undefined && (!Array.isArray(scenarios) || scenarios.length === 0)) throw new Error();
+
     const ids = [...new Set(scenarios ?? SCENARIO_IDS)];
+
     if (ids.some(id => !SCENARIO_IDS.includes(id))) throw new Error();
+
     return { ids, profile: factoryPresent ? 'agent-integration' : 'builtin',
       ...(factoryPresent ? { createAgent: createAgent as AgentTestFactory } : {}) };
   } catch { throw new TestConfigurationError(); }
